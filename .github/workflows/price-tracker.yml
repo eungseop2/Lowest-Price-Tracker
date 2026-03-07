@@ -65,7 +65,15 @@ jobs:
            "
            
            # 2. Collect Prices
-           python -m tracker.main once || echo "Some items failed, continuing with partial results"
+           python -m tracker.main once --summary-json summary.json || echo "Some items failed, continuing with partial results"
+           
+           if [ -f "summary.json" ]; then
+             echo "### 📊 Collection Summary" >> $GITHUB_STEP_SUMMARY
+             echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+             cat summary.json >> $GITHUB_STEP_SUMMARY
+             echo "" >> $GITHUB_STEP_SUMMARY
+             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+           fi
            
            # Show DB record count after collection
            python -c "
@@ -79,6 +87,11 @@ jobs:
            
            # 3. Export Dashboard UI
            python -m tracker.main export-ui
+           
+           # Prepare public directory for GitHub Pages
+           mkdir -p public
+           cp dashboard.html public/
+           cp dashboard_data.json public/
            
            # 4. Sync Result back to GCS
            python -m tracker.main sync-to-gcs && echo "GCS sync SUCCESS" || echo "GCS sync FAILED (non-fatal)"
@@ -94,7 +107,7 @@ jobs:
       - name: Upload Dashboard to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './' # Root directory contains dashboard.html and assets
+          path: './public' # Only expose the public assets
 
   deploy:
     needs: track

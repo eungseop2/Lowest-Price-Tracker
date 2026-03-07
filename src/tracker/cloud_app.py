@@ -21,18 +21,24 @@ DB_PATH = os.getenv("DB_PATH", "data/price_tracker.sqlite3")
 ARTIFACTS_DIR = os.getenv("ARTIFACTS_DIR", "data/artifacts")
 GCS_BUCKET = os.getenv("GCS_BUCKET") # GCS 버킷 이름 (필수)
 INTERVAL = int(os.getenv("COLLECT_INTERVAL", "3600"))
+ENABLE_BACKGROUND_COLLECTION = os.getenv("ENABLE_BACKGROUND_COLLECTION", "false").lower() == "true"
+ENABLE_MANUAL_COLLECT = os.getenv("ENABLE_MANUAL_COLLECT", "false").lower() == "true"
+ENABLE_GCS_SYNC = os.getenv("ENABLE_GCS_SYNC", "false").lower() == "true"
 
 @app.on_event("startup")
 async def startup_event():
     """앱 시작 시 GCS에서 DB 다운로드 및 추적 루프 시작"""
-    logger.info("Cloud App starting up...")
+    logger.info("Cloud App starting up (Read-Only Mode Default)...")
     
     # 1. GCS에서 최신 DB 다운로드
-    if GCS_BUCKET:
+    if GCS_BUCKET and ENABLE_GCS_SYNC:
         download_db(GCS_BUCKET, DB_PATH)
     
     # 2. 백그라운드 추적 루프 시작
-    asyncio.create_task(tracker_loop())
+    if ENABLE_BACKGROUND_COLLECTION:
+        asyncio.create_task(tracker_loop())
+    else:
+        logger.info("Background collection is disabled by default.")
 
 async def update_tracker_data():
     """수집 수행 및 UI/GCS 갱신 로직"""
@@ -41,25 +47,21 @@ async def update_tracker_data():
         ok, fail = await run_once(CONFIG_PATH, DB_PATH, ARTIFACTS_DIR)
         logger.info(f"Collection finished: ok={ok}, fail={fail}")
         
-        # 수집 후 UI 데이터 갱신 (export-ui 로직 내장)
+        # export-ui 로직 내장: JSON 파일만 생성하도록 변경 (HTML 주입 제거)
         from .db import ObservationStore
         from .util import dump_json
-        import re
         
         store = ObservationStore(DB_PATH)
         data = store.get_dashboard_data()
         store.close()
         
-        # dashboard.html에 데이터 주입
-        html_path = Path("dashboard.html")
-        if html_path.exists():
-            html_content = html_path.read_text(encoding="utf-8")
-            injected_script = f'<script id="data-injection">window.injectedData = {dump_json(data)};</script>'
-            new_content = re.sub(r'<script id="data-injection">.*?</script>', injected_script, html_content, flags=re.DOTALL)
-            html_path.write_text(new_content, encoding="utf-8")
+        # dashboard_data.json 만 생성
+        json_path = Path("dashboard_data.json")
+        json_path.write_text(dump_json(data), encoding="utf-8")
+        logger.info("dashboard_data.json updated.")
         
         # 3. GCS로 결과 업로드
-        if GCS_BUCKET:
+        if GCS_BUCKET and ENABLE_GCS_SYNC:
             upload_db(GCS_BUCKET, DB_PATH)
         return ok, fail
     except Exception as e:
@@ -87,6 +89,8 @@ async def get_dashboard():
 @app.post("/collect")
 async def manual_collect():
     """수동 수집 트리거"""
+    if not ENABLE_MANUAL_COLLECT:
+        return {"status": "error", "message": "Manual collection is disabled. Set ENABLE_MANUAL_COLLECT=true"}
     ok, fail = await update_tracker_data()
     return {"status": "ok", "ok": ok, "fail": fail}
 

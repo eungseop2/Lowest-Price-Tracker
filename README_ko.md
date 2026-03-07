@@ -43,15 +43,19 @@ PYTHONPATH=./src python -m tracker.main daemon --interval 1800
 
 ### targets.yaml 명세
 - `fallback_url`: `api_query` 모드 전용. API 결과가 없을 때 이동할 URL.
+- `certified_item_id`: (또는 `certified_mall_product_id`) 인증점을 식별하기 위한 네이버 쇼핑 mallProductId (인증점 가격/비인증점 갯수 추적에 사용됨).
 - `alert_threshold_percent`: (common 섹션) 알림 기준 하락폭 (예: 5.0).
 - `required_keywords` & `exclude_keywords`: 검색 결과 중 정확히 원하는 상품만 골라내기 위한 필터링 옵션.
-- `product_id`: 네이버 쇼핑 상품 ID. 정확한 매칭을 위해 입력을 강력 권장합니다.
+- `product_id`: 네이버 쇼핑 상품 카탈로그 ID. 정확한 매칭을 위해 입력을 강력 권장합니다.
 
 ### 📊 데이터 필드 정의
-- `config_mode`: `targets.yaml`에 정의된 원래 수집 모드 (`api_query` 또는 `browser_url`)
-- `source_mode`: 실제로 수집에 성공(또는 시도)한 모드. 폴백 시 `api_query` -> `browser_url`로 변할 수 있습니다.
+- `config_mode` / `source_mode`: `targets.yaml`에 정의된 원래 수집 모드 및 실제로 시도된 최종 수집 경로.
 - `fallback_used`: API 검색 실패 후 브라우저 폴백으로 성공한 경우 `1`, 그 외 `0`.
-- `status`: 수집 상태 (`OK`, `NO_MATCH`, `BrowserScrapeError` 등). 순수 상태값만 유지됩니다.
+- `status`: 수집 상태 (`OK`, `NO_MATCH`, `BrowserScrapeError` 등).
+- **인증점 지표 (새로 추가됨)**:
+  - `certified_between_non_auth_count`: 최저가와 인증점 가격 사이에 엄격히 위치한("끼어있는") 비인증점 수 (0이면 안전). 대표 지표.
+  - `certified_cheaper_non_auth_count`: 인증점 가격보다 저렴한 모든 비인증점 수 (동률 제외). 보조 지표.
+  - `certified_price` / `certified_rank` / `certified_total_sellers`: 인증점 가격, 전체 상품 중 순위, 전체 업체 수.
 
 ### 가격 변동 상태
 - `FIRST_SEEN`: 첫 수집됨
@@ -60,15 +64,23 @@ PYTHONPATH=./src python -m tracker.main daemon --interval 1800
 - `PRICE_UP`: 가격 상승 (빨간색 표시)
 
 ### 💡 정확한 추적을 위한 팁
-1. **정합성 향상**: 액세서리(케이스, 필름 등)가 최저가로 잡히는 것을 방지하려면 `exclude_keywords`에 아래 단어들을 추가하세요.
-   - 키워드 예: `케이스`, `커버`, `필름`, `파우치`, `이어팁`, `호환`, `교체`, `부품`, `스트랩`, `거치대`, `스탠드`, `충전기`, `케이블`
-2. **고객 고유 식별**: 가능하다면 `required_keywords`에 모델명(예: `MXH02FE/A`)을 포함하거나, `match` 섹션에 `product_id`를 직접 지정하는 것이 가장 정확합니다.
+1. **정합성 향상**: 액세서리(케이스, 필름 등)가 최저가로 잡히는 것을 방지하려면 `exclude_keywords`에 아래 단어들을 반드시 확인하세요.
+   - 예시: `케이스`, `커버`, `필름`, `파우치`, `이어팁`, `호환`, `교체`, `부품`, `스트랩`, `거치대`, `스탠드`, `충전기`, `케이블`
+2. **동일상품 매칭 우선**: `product_id`를 입력하면 키워드 필터링보다 우선적으로 해당 카탈로그 내 항목만 수집하므로 가장 정확합니다.
+3. **fallback_url 운영**: API 결과가 없고 `fallback_url`이 null인 경우 브라우저 폴백 없이 즉시 에러 수집. 브라우저로 백업하려는 타겟만 URL을 설정하세요.
 3. **리포트 수집경로 해석**:
    - `api_query → api_query`: API로 정상 수집
    - `api_query → browser_url [FALLBACK]`: API 검색 실패 후 브라우저 폴백 성공
    - `browser_url → browser_url`: 처음부터 브라우저로 수집
 
-## 📁 파일 구조
-- `price_tracker.sqlite3`: 모든 관측 데이터 저장
-- `price_alerts.log`: 가격 하락 알림 기록 전용 로그
-- `artifacts/`: 브라우저 모드 실패 시 스크린샷 및 HTML 저장
+## 📁 파일 및 배포 구조
+기본적으로 보안을 위해 GitHub Pages에는 대시보드 화면에 필요한 최소한의 내용만 공개됩니다.
+
+### 🌐 공개 파일 (GitHub Pages - `public/` 디렉터리 배포)
+- `dashboard.html`: 사용자 열람용 UI 컴포넌트
+- `dashboard_data.json`: 시계열 가격 데이터 및 인증점 지표 요약본 (순수 공개 데이터)
+
+### 🔒 비공개 운영 파일 (외부에 노출되지 않음)
+- `.env`: Google Cloud 인증, Email 암호 등 Secrets
+- `price_tracker.sqlite3`: 수집된 이력 전체 및 Error Log
+- `artifacts/`, `logs/` 등: 브라우저 실패 스크린샷 및 추적 이력

@@ -80,6 +80,12 @@ async def run_once(config_path: str, db_path: str, artifacts_dir: str) -> tuple[
 
     ok = 0
     fail = 0
+    failed_targets = []
+    fallback_used_count = 0
+    alerts_triggered_count = 0
+    certified_calc_success = 0
+    certified_null_count = 0
+    
     client = NaverShoppingSearchClient(timeout_seconds=app_config.timeout_seconds)
     for target in app_config.targets:
         logger.info("수집 시작 | %s | mode=%s", target.name, target.mode)
@@ -118,6 +124,9 @@ async def run_once(config_path: str, db_path: str, artifacts_dir: str) -> tuple[
                 result["certified_price"] = rank_data["certified_price"]
                 result["certified_rank"] = rank_data["rank"]
                 result["certified_total_sellers"] = rank_data["total"]
+                result["certified_lowest_price"] = rank_data.get("certified_lowest_price")
+                result["certified_between_non_auth_count"] = rank_data.get("certified_between_non_auth_count")
+                result["certified_cheaper_non_auth_count"] = rank_data.get("certified_cheaper_non_auth_count")
 
             # 4. 필수 필드 기본값 보장 (의미 오염 방지 및 DB 정합성)
             result.setdefault("fallback_used", 0)
@@ -128,6 +137,15 @@ async def run_once(config_path: str, db_path: str, artifacts_dir: str) -> tuple[
             # 4. 가격 하락 알림 체크 (하락폭 기준)
             alert_active = check_and_alert(result, prev_price, app_config.alert_threshold_percent)
             result["alert_triggered"] = 1 if alert_active else 0
+            
+            if result.get("fallback_used"):
+                fallback_used_count += 1
+            if result.get("alert_triggered"):
+                alerts_triggered_count += 1
+            if result.get("certified_price") is not None:
+                certified_calc_success += 1
+            else:
+                certified_null_count += 1
 
             store.insert(result)
             if result.get("success"):
@@ -139,10 +157,12 @@ async def run_once(config_path: str, db_path: str, artifacts_dir: str) -> tuple[
                     changed_items.append(result)
             else:
                 fail += 1
+                failed_targets.append(target.name)
                 logger.warning("수집 미일치 | %s | %s", target.name, result.get("status"))
 
         except Exception as exc:  # noqa: BLE001
             fail += 1
+            failed_targets.append(target.name)
             logger.exception("수집 실패 | %s | %s", target.name, exc)
             store.insert({
                 "target_name": target.name,
@@ -168,14 +188,14 @@ async def run_once(config_path: str, db_path: str, artifacts_dir: str) -> tuple[
     if changed_items:
         send_price_alert(changed_items, email_from, email_password, email_to)
 
-    return ok, fail
+    return ok, fail, {"failed_targets": failed_targets, "fallback_used_count": fallback_used_count, "alerts_triggered_count": alerts_triggered_count, "certified_calc_success": certified_calc_success, "certified_null_count": certified_null_count}
 
 
 async def run_daemon(config_path: str, db_path: str, artifacts_dir: str, interval_seconds: int) -> None:
     while True:
         # time.monotonic() 기반 간격 계산
         start_time = time.monotonic()
-        ok, fail = await run_once(config_path, db_path, artifacts_dir)
+        ok, fail, _ = await run_once(config_path, db_path, artifacts_dir)
         logger.info("1회차 완료 | ok=%s fail=%s", ok, fail)
         
         elapsed = time.monotonic() - start_time
@@ -195,6 +215,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", default="./latest.csv", help="CSV output path for export-latest")
     parser.add_argument("--html-out", default="./price_report.html", help="HTML output path for export-html")
     parser.add_argument("--limit", type=int, default=20, help="export-html record limit per target")
+    parser.add_argument("--summary-json", type=str, default=None, help="JSON file path to write run summary")
+    parser.add_argument("--strict-exit", action="store_true", help="Exit 1 if any target fails (for actions testing)")
     parser.add_argument("--verbose", action="store_true")
     return parser
 
@@ -207,8 +229,17 @@ def main() -> int:
 
     try:
         if args.command == "once":
-            ok, fail = asyncio.run(run_once(args.config, args.db, args.artifacts_dir))
-            # 부분 실패(fail > 0)하더라도, 적어도 하나라도 성공했으면(ok > 0) 전체 파이프라인(대시보드 생성 등)을 이어가도록 0 반환
+            ok, fail, summary_dict = asyncio.run(run_once(args.config, args.db, args.artifacts_dir))
+            if args.summary_json:
+                out = Path(args.summary_json).resolve()
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(dump_json({"ok": ok, "fail": fail, **summary_dict}), encoding="utf-8")
+                logger.info(f"Summary JSON 저장됨: {args.summary_json}")
+            
+            if args.strict_exit and fail > 0:
+                return 1
+
+            # 부분 실패(fail > 0)하더라도, 적어도 하나라도 성공했으면(ok > 0) 전체 파이프라인을 이어가도록 0 반환
             return 0 if (ok > 0 or fail == 0) else 1
 
         if args.command == "daemon":

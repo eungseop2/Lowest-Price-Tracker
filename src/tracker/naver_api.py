@@ -226,8 +226,22 @@ def collect_certified_rank(
         # 순위: 나보다 싸거나 같은 가격의 업체 수
         rank = sum(1 for v in unique_items if v["price"] <= cert_price)
         total = len(unique_items)
+        
+        lowest_price = unique_items[0]["price"] # 정렬되어 있으므로 첫번째가 최저가
 
-        return {"certified_price": cert_price, "rank": rank, "total": total}
+        # 최저가 < price < 인증가 인 업체 수 (인증점 제외)
+        between_count = sum(1 for v in unique_items if v["id"] != cert_id and lowest_price < v["price"] < cert_price)
+        # 인증점보다 싼 업체 수 (인증점 자체 포함 여부 주의)
+        cheaper_count = sum(1 for v in unique_items if v["id"] != cert_id and v["price"] < cert_price)
+
+        return {
+            "certified_price": cert_price,
+            "rank": rank,
+            "total": total,
+            "certified_lowest_price": lowest_price,
+            "certified_between_non_auth_count": between_count,
+            "certified_cheaper_non_auth_count": cheaper_count
+        }
 
     except Exception:
         return None

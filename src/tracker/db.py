@@ -33,7 +33,10 @@ CREATE TABLE IF NOT EXISTS observations (
     alert_triggered INTEGER DEFAULT 0,
     certified_price INTEGER,
     certified_rank INTEGER,
-    certified_total_sellers INTEGER
+    certified_total_sellers INTEGER,
+    certified_lowest_price INTEGER,
+    certified_between_non_auth_count INTEGER,
+    certified_cheaper_non_auth_count INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_observations_target_time
@@ -52,6 +55,9 @@ _MIGRATION_COLUMNS = [
     ("certified_price", "INTEGER"),
     ("certified_rank", "INTEGER"),
     ("certified_total_sellers", "INTEGER"),
+    ("certified_lowest_price", "INTEGER"),
+    ("certified_between_non_auth_count", "INTEGER"),
+    ("certified_cheaper_non_auth_count", "INTEGER"),
 ]
 
 
@@ -104,6 +110,9 @@ class ObservationStore:
             "certified_price",
             "certified_rank",
             "certified_total_sellers",
+            "certified_lowest_price",
+            "certified_between_non_auth_count",
+            "certified_cheaper_non_auth_count",
         ]
         values = [payload.get(col) for col in columns]
         self.conn.execute(
@@ -192,6 +201,9 @@ class ObservationStore:
                 "certified_price": latest["certified_price"],
                 "certified_rank": latest["certified_rank"],
                 "certified_total": latest["certified_total_sellers"],
+                "certified_lowest_price": latest["certified_lowest_price"],
+                "certified_between_count": latest["certified_between_non_auth_count"],
+                "certified_cheaper_count": latest["certified_cheaper_non_auth_count"],
                 "history": [
                     {"t": r["collected_at"], "p": r["price"]} for r in hist_90d[-200:] # 차트용 200개로 확장
                 ]
@@ -233,14 +245,18 @@ class ObservationStore:
             writer.writerow([
                 "target_name", "collected_at", "config_mode", "source_mode", "fallback_used", "success", "status",
                 "title", "price", "seller_name", "price_change_status", "prev_price",
-                "price_delta", "price_delta_pct", "product_url", "error_message"
+                "price_delta", "price_delta_pct", "product_url", "error_message",
+                "certified_price", "certified_rank", "certified_total_sellers",
+                "certified_lowest_price", "certified_between_non_auth_count", "certified_cheaper_non_auth_count"
             ])
             for r_raw in rows:
                 r = dict(r_raw)
                 writer.writerow([
                     r["target_name"], r["collected_at"], r.get("config_mode"), r["source_mode"], r.get("fallback_used", 0), r["success"], r["status"],
                     r["title"], r["price"], r["seller_name"], r["price_change_status"], r["prev_price"],
-                    r["price_delta"], r["price_delta_pct"], r["product_url"], r["error_message"]
+                    r["price_delta"], r["price_delta_pct"], r["product_url"], r["error_message"],
+                    r.get("certified_price"), r.get("certified_rank"), r.get("certified_total_sellers"),
+                    r.get("certified_lowest_price"), r.get("certified_between_non_auth_count"), r.get("certified_cheaper_non_auth_count")
                 ])
         return str(out)
 

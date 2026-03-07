@@ -9,6 +9,7 @@ targets:
     mode: "api_query"
     query: "에어팟 프로 2세대"
     fallback_url: "https://search.shopping.naver.com/catalog/35161048618"
+    certified_item_id: "애플공식스토어_mallProductId" # 인증점 기능 사용 시 mallProductId 기준 ID
     match:
       required_keywords: ["에어팟", "프로"]
       exclude_keywords: ["중고", "리퍼", "해외", "케이스", "커버", "필름", "파우치", "이어팁", "호환", "스트랩"]
