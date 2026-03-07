@@ -502,8 +502,33 @@
                 height: auto;
             }
 
+            .chart-section,
+            .history-section {
+                padding: 24px 16px;
+                border-radius: 20px;
+                overflow: hidden;
+            }
+
+            .chart-container {
+                height: 260px;
+            }
+
+            .history-section {
+                overflow-x: auto;
+            }
+
+            table {
+                min-width: 480px;
+            }
+
+            td,
+            th {
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
             }
 
             header {
@@ -595,7 +620,7 @@
         </div>
 
         <div class="history-section">
-            <div class="history-title">수집 타임라인</div>
+            <div class="history-title">시장가 히스토리</div>
             <table id="historyTable">
                 <thead>
                     <tr>
