@@ -72,6 +72,7 @@ jobs:
           mkdir -p public
           [ -f "dashboard.html" ] && cp dashboard.html public/index.html || echo "No dashboard.html found"
           [ -f "dashboard_data.json" ] && cp dashboard_data.json public/ || echo "No dashboard_data.json found"
+          [ -f "logo.png" ] && cp logo.png public/ || echo "No logo.png found"
 
       - name: Sync Result back to GCS
         if: always()
