@@ -2,7 +2,7 @@ name: Naver Price Tracker (Automated)
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour on the hour
+    - cron: '17 * * * *'  # Every hour on the hour
   workflow_dispatch:      # Manual trigger from GitHub UI (Refresh Now)
   push:
     branches: [ main ]    # Run on every push to main
