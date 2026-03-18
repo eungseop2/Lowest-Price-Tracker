@@ -120,15 +120,18 @@ async def run_once(app_config, artifacts_dir: str, db_path: str, summary_json: s
             result["alert_triggered"] = 0
             
             # 알림 체크
+            # 알림 체크 (가격 변동 기반)
             if result.get("success"):
-                alert_active = check_and_alert(result, prev_price, app_config.alert_threshold_percent)
-                result["alert_triggered"] = 1 if alert_active else 0
-                
-                if result.get("alert_triggered"):
+                status = result.get("price_change_status")
+
+                # 가격이 변동된 경우 (상승 or 하락)
+                if status in ["PRICE_DOWN", "PRICE_UP"]:
+                    result["alert_triggered"] = 1
                     alerts_triggered_count += 1
                     changed_items.append(result)
-
-                ok += 1
+                else:
+                    result["alert_triggered"] = 0
+                    ok += 1
                 if result.get("fallback_used"):
                     fallback_used_count += 1
                 
