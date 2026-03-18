@@ -122,6 +122,7 @@ async def run_once(app_config, artifacts_dir: str, db_path: str, summary_json: s
             # 알림 체크
             # 알림 체크 (가격 변동 기반)
             if result.get("success"):
+                ok += 1
                 status = result.get("price_change_status")
 
                 # 가격이 변동된 경우 (상승 or 하락)
@@ -131,7 +132,7 @@ async def run_once(app_config, artifacts_dir: str, db_path: str, summary_json: s
                     changed_items.append(result)
                 else:
                     result["alert_triggered"] = 0
-                    ok += 1
+                
                 if result.get("fallback_used"):
                     fallback_used_count += 1
                 
