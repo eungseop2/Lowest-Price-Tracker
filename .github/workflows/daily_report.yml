@@ -1,0 +1,50 @@
+name: Daily Price Tracker Report
+
+on:
+  schedule:
+    # KST 기준 매일 오전 8시 실행 (UTC 23:00)
+    - cron: '0 23 * * *'
+  # GitHub 웹사이트에서 수동으로도 실행 가능하게 버튼 추가
+  workflow_dispatch: 
+
+jobs:
+  run-tracker-and-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 환경 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 패키지 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # 브라우저 스크래핑(fall_back_url 등)이 필요하면 아래 주석을 해제하세요
+          # playwright install --with-deps chromium
+
+      - name: 최신 데이터 1회 수집 및 UI 갱신
+        run: |
+          python -m src.tracker.main once
+          python -m src.tracker.main export-ui
+
+      - name: 일단위 메일 리포트 발송
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          python -m src.tracker.main daily-report
+
+      - name: 결과 DB 및 대시보드 저장소에 반영 (Push)
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add price_tracker.sqlite3 dashboard_data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update price tracker database and dashboard" && git push)
+        continue-on-error: true
