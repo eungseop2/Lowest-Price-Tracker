@@ -993,7 +993,15 @@
                 <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
                 전체선택
             </label>
-            <span id="checkedCount" style="font-size:11px;color:var(--text-muted);">0개 선택</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="checkedCount" style="font-size:11px;color:var(--text-muted);">0개 선택</span>
+                <select id="sortOption" onchange="renderProductList()" style="font-size:11px; border:1px solid var(--glass-border); border-radius:4px; padding:2px; color:var(--text-main); background: #ffffff; cursor: pointer; outline: none;">
+                    <option value="default">기본순</option>
+                    <option value="price_asc">가격 낮은순</option>
+                    <option value="price_desc">가격 높은순</option>
+                    <option value="name_asc">가나다순</option>
+                </select>
+            </div>
         </div>
         <div class="category-tabs" id="categoryTabs">
             <!-- Category Pills -->
@@ -1240,16 +1248,35 @@
 
         function renderProductList() {
             const list = document.getElementById('productList');
-            const filtered = dashboardData.products.map((p, i) => ({ ...p, originalIndex: i }))
+            let filtered = dashboardData.products.map((p, i) => ({ ...p, originalIndex: i }))
                 .filter(p => selectedCategory === '전체' || p.category === selectedCategory);
+
+            const sortOption = document.getElementById('sortOption')?.value || 'default';
+            if (sortOption === 'price_asc') {
+                filtered.sort((a, b) => (a.current_price || 999999999) - (b.current_price || 999999999));
+            } else if (sortOption === 'price_desc') {
+                filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
+            } else if (sortOption === 'name_asc') {
+                filtered.sort((a, b) => a.name.localeCompare(b.name));
+            }
+
+            const checkedIndices = Array.from(document.querySelectorAll('.product-checkbox:checked')).map(cb => parseInt(cb.dataset.index));
 
             list.innerHTML = filtered.map((p) => {
                 const change = p.change_pct ? p.change_pct.toFixed(1) + '%' : '0.0%';
                 const badgeClass = p.status === 'PRICE_DOWN' ? 'badge-down' : (p.status === 'PRICE_UP' ? 'badge-up' : 'badge-none');
                 const trendIcon = p.status === 'PRICE_DOWN' ? '⬇️' : (p.status === 'PRICE_UP' ? '⬆️' : '➖');
+                const isChecked = checkedIndices.includes(p.originalIndex) ? 'checked' : '';
                 return `
-                    <li class="product-item ${p.originalIndex === selectedProductIndex ? 'active' : ''}" onclick="selectProduct(${p.originalIndex})">
-                        <input type="checkbox" class="product-checkbox" data-index="${p.originalIndex}" onclick="event.stopPropagation(); updateCheckedCount();">
+                    <li class="product-item ${p.originalIndex === selectedProductIndex ? 'active' : ''}" 
+                        onclick="selectProduct(${p.originalIndex})"
+                        draggable="true" 
+                        ondragstart="handleDragStart(event, ${p.originalIndex})" 
+                        ondragover="handleDragOver(event)" 
+                        ondrop="handleDrop(event, ${p.originalIndex})"
+                        ondragleave="handleDragLeave(event)"
+                        ondragend="handleDragEnd(event)">
+                        <input type="checkbox" class="product-checkbox" data-index="${p.originalIndex}" ${isChecked} onclick="event.stopPropagation(); updateCheckedCount();">
                         <img class="product-thumb" src="${p.image_url || ''}" alt="">
                         <div class="product-info">
                             <span class="product-name">${p.name}</span>
@@ -1261,6 +1288,67 @@
                     </li>
                 `;
             }).join('');
+
+            updateCheckedCount();
+        }
+
+        let draggedIndex = null;
+
+        function handleDragStart(e, index) {
+            draggedIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', index);
+            setTimeout(() => { e.target.style.opacity = '0.5'; }, 0);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const li = e.target.closest('li.product-item');
+            if (li) {
+                li.style.borderTop = '2px solid var(--toss-blue)';
+            }
+        }
+
+        function handleDragLeave(e) {
+            const li = e.target.closest('li.product-item');
+            if (li) {
+                li.style.borderTop = '1px solid transparent';
+            }
+        }
+
+        function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            const li = e.target.closest('li.product-item');
+            if (li) li.style.borderTop = '1px solid transparent';
+
+            if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+            const draggedItem = dashboardData.products[draggedIndex];
+            const targetItem = dashboardData.products[targetIndex];
+
+            const selectedItem = dashboardData.products[selectedProductIndex];
+
+            dashboardData.products.splice(draggedIndex, 1);
+            let newTargetIdx = dashboardData.products.indexOf(targetItem);
+            
+            if (newTargetIdx === -1) newTargetIdx = dashboardData.products.length;
+            dashboardData.products.splice(newTargetIdx, 0, draggedItem);
+
+            if (selectedItem) {
+                selectedProductIndex = dashboardData.products.indexOf(selectedItem);
+            }
+
+            const sortSelect = document.getElementById('sortOption');
+            if (sortSelect) sortSelect.value = 'default';
+
+            renderProductList();
+        }
+
+        function handleDragEnd(e) {
+            e.target.style.opacity = '1';
+            document.querySelectorAll('li.product-item').forEach(li => li.style.borderTop = '1px solid transparent');
+            draggedIndex = null;
         }
 
         function selectProduct(index) {
