@@ -92,6 +92,12 @@ def send_daily_report(db_path: str, email_from: str, email_password: str, email_
             </tbody>
         </table>
     </div>
+    <div style="margin-top:32px;text-align:center">
+        <a href="https://eungseop2.github.io/Lowest-Price-Tracker/" 
+           style="background-color:#2563eb;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block">
+           📊 대시보드 바로가기
+        </a>
+    </div>
     </body></html>
     """
     

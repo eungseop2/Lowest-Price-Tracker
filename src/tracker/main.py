@@ -25,7 +25,7 @@ from .naver_api import (
 )
 from .notifier import send_price_alert
 from .report import send_daily_report
-from .util import calc_change_metrics, dump_json, utc_now_iso
+from .util import calc_change_metrics, dump_json, utc_now_iso, is_night_time_kst
 
 logger = logging.getLogger("naver_price_tracker")
 
@@ -216,14 +216,17 @@ async def run_once(app_config, artifacts_dir: str, db_path: str, summary_json: s
     r_store.close()
     store.close()
 
-    # 이메일 알림
+    # 이메일 알림 (KST 기준 야간 시간대 21:00~08:00 제외)
     if changed_items:
-        send_price_alert(
-            changed_items,
-            app_config.email.email_from,
-            app_config.email.email_password,
-            app_config.email.email_to
-        )
+        if not is_night_time_kst():
+            send_price_alert(
+                changed_items,
+                app_config.email.email_from,
+                app_config.email.email_password,
+                app_config.email.email_to
+            )
+        else:
+            logger.info("야간 시간(21:00-08:00 KST)이므로 이메일 알림을 건너뜁니다.")
 
     logger.info("최종 결과 | OK: %d, FAIL: %d, Fallback: %d, Alert: %d", ok, fail, fallback_used_count, alerts_triggered_count)
 

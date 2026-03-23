@@ -103,6 +103,12 @@ def _build_html(downs: list, ups: list) -> str:
         </thead>
         <tbody>{rows}</tbody>
     </table>
+    <div style="margin-top:24px;text-align:center">
+        <a href="https://eungseop2.github.io/Lowest-Price-Tracker/" 
+           style="background-color:#2563eb;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block">
+           📊 대시보드 바로가기
+        </a>
+    </div>
     <p style="color:#94a3b8;font-size:12px;margin-top:24px">
         Price Insight Pro · 자동 발송 이메일입니다.
     </p>

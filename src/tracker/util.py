@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -78,3 +78,9 @@ def calc_change_metrics(current: int, previous: int | None) -> tuple[int | None,
     delta = current - previous
     pct = round(delta / previous * 100, 2)
     return delta, pct
+def is_night_time_kst() -> bool:
+    """KST(한국 표준시) 기준 야간 시간(21:00 ~ 08:00) 여부를 확인합니다."""
+    kst = timezone(timedelta(hours=9))
+    current_hour_kst = datetime.now(kst).hour
+    # 21시부터 다음 날 08시 사이는 야간으로 간주
+    return current_hour_kst >= 21 or current_hour_kst < 8
