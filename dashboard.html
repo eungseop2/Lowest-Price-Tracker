@@ -1581,7 +1581,7 @@
             // 1. 현재 최저가 시트 데이터 준비
             const currentData = [["상품명", "현재 최저가", "판매처", "수집시간", "네이버 랭킹", "수집 키워드"]];
             // 2. 가격 히스토리 시트 데이터 준비
-            const historyData = [["상품명", "수집일시", "가격", "판매처"]];
+            const historyData = [["상품명", "수집날짜", "수집일시", "가격", "판매처"]];
             // 3. 키워드 랭킹 시트 데이터 준비
             const rankingData = [["검색 키워드", "순위", "상품명(네이버)", "가격", "판매처", "수집시간"]];
 
@@ -1610,8 +1610,9 @@
                 // 히스토리 정보 추가
                 p.history.forEach(h => {
                     const d = new Date(h.t);
-                    const formattedDate = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-                    historyData.push([p.name, formattedDate, h.p, p.seller]);
+                    const formattedDateOnly = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+                    const formattedDateTime = `${formattedDateOnly} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+                    historyData.push([p.name, formattedDateOnly, formattedDateTime, h.p, p.seller]);
                 });
 
                 // 랭킹 정보 추가 (중복 방지)
